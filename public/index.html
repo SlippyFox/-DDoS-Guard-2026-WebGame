@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DDoS Ninja Pro</title>
+    <link rel="icon" type="image/png" href="mascot7.png">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+</head>
+<body :class="{'glitch-active': resultStatus === 'loss'}" id="app">
+
+    <div v-if="step === 'reg'" class="overlay">
+        <img src="mascot1.png" class="bg-mascot" alt="">
+        
+        <div class="card">
+            <img src="Logo_basic_inversion.svg" alt="DDoS-Guard" style="width: 200px; margin-bottom: 20px;"> 
+            <h2 style="font-family: Montserrat; font-size: 22px; color: #0077ff; margin-top: 0;">СИСТЕМА ЗАЩИТЫ</h2>
+            <p style="font-size: 13px; color: #888; margin-bottom: 25px;">Авторизация оператора</p>
+            
+            <input v-model="form.name" placeholder="Позывной (Имя)">
+            <input v-model="form.phone" placeholder="Номер телефона (+7...)">
+            
+            <button @click="login">Вход в терминал</button>
+            <button class="btn-tg" @click="openTgBot">Регистрация через Telegram</button>
+        </div>
+    </div>
+
+    <div v-show="step === 'game'">
+        <div class="hud">
+            <div>СЧЕТ: <span style="color: #0077ff;">{{ score }}</span></div>
+            <div>ТАЙМЕР: {{ timeLeft }}с</div>
+            <div :style="{ color: errors >= 2 ? '#ff4d4d' : '#ffffff' }">ОШИБКИ: {{ errors }}/3</div>
+        </div>
+        <div class="combo-hud">
+            <div style="color: #00ff66;">КОМБО: {{ combo }}/10</div>
+            <div style="font-size: 14px; color: #888;" v-if="speedMultiplier > 1">Разгон: x{{ speedMultiplier.toFixed(1) }}</div>
+        </div>
+        <div id="game-container"></div>
+    </div>
+
+    <div v-if="resultStatus === 'win'" class="result-screen result-win">
+        <img src="mascot1.png" style="width: 250px; margin-bottom: 20px; filter: drop-shadow(0 0 20px #00ff66);">
+        <h1 style="color: #00ff66; font-size: 40px; margin: 0;">СИСТЕМА ЗАЩИЩЕНА</h1>
+        <p style="color: #fff; font-size: 20px;">DDoS-атака успешно отражена. Спасибо за работу, оператор!</p>
+        <h2 style="color: #fff; margin-top: 30px;">Итоговый счет: {{ score }}</h2>
+    </div>
+
+    <div v-if="resultStatus === 'loss'" class="result-screen result-loss">
+        <img src="virus.png" style="width: 300px; margin-bottom: 20px; filter: drop-shadow(0 0 30px #ff0000);">
+        <h1 style="color: #ff0000; font-size: 50px; margin: 0;">КРИТИЧЕСКИЙ СБОЙ</h1>
+        <p style="color: #fff; font-size: 24px;">DDOS-АТАКА ПРОШЛА. СЕРВЕРА ПАЛИ.</p>
+    </div>
+
+    <div v-if="step === 'leaderboard'" class="overlay">
+        <div class="card" style="width: 450px;">
+            <h2 style="color: #0077ff; margin-bottom: 10px;">ТОП ОПЕРАТОРОВ</h2>
+            <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p style="margin: 0; color: #888;">Ваш результат:</p>
+                <h1 style="margin: 5px 0; color: #fff;">{{ score }}</h1>
+            </div>
+            <table>
+                <tr v-for="(user, index) in users" :key="index" :class="{'rank-1': index===0, 'rank-2': index===1, 'rank-3': index===2}">
+                    <td style="width: 40px; font-weight: bold;">#{{ index + 1 }}</td>
+                    <td>{{ user.name }}</td>
+                    <td style="text-align: right;">{{ user.score }}</td>
+                </tr>
+            </table>
+            <button @click="logout" style="margin-top: 25px; background: #333;">Завершить сеанс</button>
+        </div>
+    </div>
+
+    <div v-if="step === 'admin'" class="overlay">
+        <div class="card" style="width: 700px;">
+            <h2 style="color: #ff4d4d;">ТЕРМИНАЛ АДМИНИСТРАТОРА</h2>
+            <div style="max-height: 400px; overflow-y: auto;">
+                <table>
+                    <thead><tr><th>Имя</th><th>Телефон</th><th>Очки</th><th>Статус</th></tr></thead>
+                    <tbody>
+                        <tr v-for="user in users" :key="user.id">
+                            <td>{{ user.name }}</td><td>{{ user.phone }}</td>
+                            <td>{{ user.score }}</td>
+                            <td :style="{color: user.played ? '#ff4d4d' : '#00ff66'}">{{ user.played ? 'Сыграл' : 'Готов' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button @click="resetFullDB" style="background: #ff0000;">Очистить БД</button>
+                <button @click="logout" style="background: #333;">Выйти</button>
+            </div>
+        </div>
+    </div>
+    <input 
+    v-model="form.phone" 
+    placeholder="Номер телефона (11 цифр)" 
+    type="tel" 
+    @input="form.phone = form.phone.replace(/[^\d+]/g, '')"
+>
+<div :class="{'timer-low': timeLeft <= 10 && timeLeft > 0}">ТАЙМЕР: {{ timeLeft }}с</div>
+
+<script src="game.js"></script>
+</body>
+</html>
